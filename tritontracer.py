@@ -5,7 +5,9 @@ import binascii
 import idaapi
 import idc
 import ida_idaapi
+import idaapi
 import ida_ua
+import ida_nalt
 import triton
 from triton     import *
 import ida_bytes
@@ -22,19 +24,9 @@ Triton.setMode(MODE.ALIGNED_MEMORY, True)
 # Define entry point
 ENTRY = 0x0
 
-def initContext():
-    #Triton.setConcreteRegisterValue(Triton.registers.rsp, 0x7fff0fff)
-    #Triton.setConcreteRegisterValue(Triton.registers.rbp, 0x7fff0fff)
 
-
-    #Triton.setConcreteRegisterValue(Triton.registers.r11, 0x14001d7c8 )
-
-    #Triton.setConcreteRegisterValue(Triton.registers.r9, 0x53)
-
-    return
 
 # Init context memory
-initContext()
 
 class tracer_Plugin(idaapi.plugin_t):
     flags = idaapi.PLUGIN_KEEP
@@ -43,16 +35,11 @@ class tracer_Plugin(idaapi.plugin_t):
     wanted_name = "TritonTracer"
     wanted_hotkey = "CTRL+Q"
     Triton = TritonContext()
-    Triton.setArchitecture(ARCH.X86_64)
-
-    # Symbolic optimization
-    Triton.setMode(MODE.ALIGNED_MEMORY, True)
 
     # Define entry point
     ENTRY = 0x0
 
     # Init context memory
-    initContext()
     insn_bytes_len = 0
     inst = Instruction()
     insn = ida_ua.insn_t()
@@ -61,20 +48,38 @@ class tracer_Plugin(idaapi.plugin_t):
     total_inst = 0
     pushval = 0
 
-    def init(self):
-        Triton = TritonContext()
-        Triton.setArchitecture(ARCH.X86_64)
+    def initContext(self):
+    #Triton.setConcreteRegisterValue(Triton.registers.rsp, 0x7fff0fff)
+    #Triton.setConcreteRegisterValue(Triton.registers.rbp, 0x7fff0fff)
 
-        insn = ida_ua.insn_t()
+
+        #self.Triton.setConcreteRegisterValue(Triton.registers.r10, 0x14002950E )
+
+        #Triton.setConcreteRegisterValue(Triton.registers.r9, 0x53)
+
+        return
+
+    def init(self):
+        self.Triton.setArchitecture(ARCH.X86_64)
+
+        self.insn = ida_ua.insn_t()
+
     # Symbolic optimization
-        Triton.setMode(MODE.ALIGNED_MEMORY, True)
-        Triton.setMode(MODE.CONSTANT_FOLDING, True)
-        Triton.setMode(MODE.AST_OPTIMIZATIONS, True)
+        self.Triton.setMode(MODE.ALIGNED_MEMORY, True)
+        self.Triton.setMode(MODE.CONSTANT_FOLDING, True)
+        self.Triton.setMode(MODE.AST_OPTIMIZATIONS, True)
 
         # Define entry point
 
         # Init context memory
-        initContext()
+        self.initContext()
+        last_addr = idaapi.inf_get_max_ea()
+        imagebase = ida_nalt.get_imagebase() + 0x1000
+        size = last_addr - imagebase
+        memory_bytes = ida_bytes.get_bytes(imagebase,size)
+        a = self.Triton.setConcreteMemoryAreaValue(imagebase, memory_bytes)
+
+        print("imgbase: ", hex(imagebase), ", size: ", len(memory_bytes), ", 0x2850e :", hex ( memory_bytes[0x2850e] ), ", MemoryAccess :", hex(self.Triton.getConcreteMemoryValue(MemoryAccess(0x14002950e, CPUSIZE.DWORD))) )
         return idaapi.PLUGIN_OK
 
 
@@ -82,14 +87,14 @@ class tracer_Plugin(idaapi.plugin_t):
         memory_bytes = ida_bytes.get_bytes(addr,8)
 
         #print("setting memory at", hex(addr) )
-        Triton.setConcreteMemoryValue(addr, memory_bytes[0])
-        Triton.setConcreteMemoryValue(addr+1, memory_bytes[1])
-        Triton.setConcreteMemoryValue(addr+2, memory_bytes[2])
-        Triton.setConcreteMemoryValue(addr+3, memory_bytes[3])
-        Triton.setConcreteMemoryValue(addr+4, memory_bytes[4])
-        Triton.setConcreteMemoryValue(addr+5, memory_bytes[5])
-        Triton.setConcreteMemoryValue(addr+6, memory_bytes[6])
-        Triton.setConcreteMemoryValue(addr+7, memory_bytes[7])
+        self.Triton.setConcreteMemoryValue(addr, memory_bytes[0])
+        self.Triton.setConcreteMemoryValue(addr+1, memory_bytes[1])
+        self.Triton.setConcreteMemoryValue(addr+2, memory_bytes[2])
+        self.Triton.setConcreteMemoryValue(addr+3, memory_bytes[3])
+        self.Triton.setConcreteMemoryValue(addr+4, memory_bytes[4])
+        self.Triton.setConcreteMemoryValue(addr+5, memory_bytes[5])
+        self.Triton.setConcreteMemoryValue(addr+6, memory_bytes[6])
+        self.Triton.setConcreteMemoryValue(addr+7, memory_bytes[7])
         self.symb_ex(ea) # problem arises here
 
     def add_space(self,input_string):
@@ -110,14 +115,14 @@ class tracer_Plugin(idaapi.plugin_t):
 
 
         print("reading memory at", hex(addr) , "to : ", memory_bytes )
-        Triton.setConcreteMemoryValue(addr, memory_bytes[0])
-        Triton.setConcreteMemoryValue(addr+1, memory_bytes[1])
-        Triton.setConcreteMemoryValue(addr+2, memory_bytes[2])
-        Triton.setConcreteMemoryValue(addr+3, memory_bytes[3])
-        Triton.setConcreteMemoryValue(addr+4, memory_bytes[4])
-        Triton.setConcreteMemoryValue(addr+5, memory_bytes[5])
-        Triton.setConcreteMemoryValue(addr+6, memory_bytes[6])
-        Triton.setConcreteMemoryValue(addr+7, memory_bytes[7])
+        self.Triton.setConcreteMemoryValue(addr, memory_bytes[0])
+        self.Triton.setConcreteMemoryValue(addr+1, memory_bytes[1])
+        self.Triton.setConcreteMemoryValue(addr+2, memory_bytes[2])
+        self.Triton.setConcreteMemoryValue(addr+3, memory_bytes[3])
+        self.Triton.setConcreteMemoryValue(addr+4, memory_bytes[4])
+        self.Triton.setConcreteMemoryValue(addr+5, memory_bytes[5])
+        self.Triton.setConcreteMemoryValue(addr+6, memory_bytes[6])
+        self.Triton.setConcreteMemoryValue(addr+7, memory_bytes[7])
         return Triton.processing(self.inst)
 
     def write_operand(self,ea):
@@ -153,7 +158,9 @@ class tracer_Plugin(idaapi.plugin_t):
         for op in operands:
             if type(op) == type(MemoryAccess(4,8)):
                 read_this_op = op.getAddress()
-                self.read_memory(read_this_op, ea)
+                print("read_this_op :", hex ( read_this_op ) )
+                print ( hex(self.Triton.getConcreteMemoryValue(MemoryAccess(read_this_op, CPUSIZE.DWORD))) )
+                #self.read_memory(read_this_op, ea)
 
         return 
 
@@ -172,7 +179,7 @@ class tracer_Plugin(idaapi.plugin_t):
 
 
 
-        Triton.processing(self.inst)
+        self.Triton.processing(self.inst)
 
         #block_len = len(block.getInstructions() ) #losing performance here.
 
@@ -198,47 +205,47 @@ class tracer_Plugin(idaapi.plugin_t):
         print('Curr ip:', self.inst)
 
         # Next instruction
-        ip = Triton.getRegisterAst(Triton.registers.rip).evaluate()
+        ip = self.Triton.getRegisterAst(Triton.registers.rip).evaluate()
 
 
 
-        ax = Triton.getConcreteRegisterValue(Triton.registers.rax)
+        ax = self.Triton.getConcreteRegisterValue(Triton.registers.rax)
 
-        cx = Triton.getConcreteRegisterValue(Triton.registers.rcx)
+        cx = self.Triton.getConcreteRegisterValue(Triton.registers.rcx)
 
-        dx = Triton.getConcreteRegisterValue(Triton.registers.rdx)
+        dx = self.Triton.getConcreteRegisterValue(Triton.registers.rdx)
 
-        bx = Triton.getConcreteRegisterValue(Triton.registers.rbx)
+        bx = self.Triton.getConcreteRegisterValue(Triton.registers.rbx)
 
-        si = Triton.getConcreteRegisterValue(Triton.registers.rsi)
+        si = self.Triton.getConcreteRegisterValue(Triton.registers.rsi)
 
-        di = Triton.getConcreteRegisterValue(Triton.registers.rdi)
+        di = self.Triton.getConcreteRegisterValue(Triton.registers.rdi)
 
-        sp = Triton.getConcreteRegisterValue(Triton.registers.rsp)
+        sp = self.Triton.getConcreteRegisterValue(Triton.registers.rsp)
 
-        bp = Triton.getConcreteRegisterValue(Triton.registers.rbp)
+        bp = self.Triton.getConcreteRegisterValue(Triton.registers.rbp)
 
 
         self.rax = ax
-        r8 = Triton.getConcreteRegisterValue(Triton.registers.r8)
+        r8 = self.Triton.getConcreteRegisterValue(Triton.registers.r8)
 
-        r9 = Triton.getConcreteRegisterValue(Triton.registers.r9)
+        r9 = self.Triton.getConcreteRegisterValue(Triton.registers.r9)
 
-        r10 = Triton.getConcreteRegisterValue(Triton.registers.r10)
+        r10 = self.Triton.getConcreteRegisterValue(Triton.registers.r10)
 
-        r11 = Triton.getConcreteRegisterValue(Triton.registers.r11)
+        r11 = self.Triton.getConcreteRegisterValue(Triton.registers.r11)
 
-        r12 = Triton.getConcreteRegisterValue(Triton.registers.r12)
+        r12 = self.Triton.getConcreteRegisterValue(Triton.registers.r12)
 
-        r13 = Triton.getConcreteRegisterValue(Triton.registers.r13)
+        r13 = self.Triton.getConcreteRegisterValue(Triton.registers.r13)
 
-        r14 = Triton.getConcreteRegisterValue(Triton.registers.r14)
+        r14 = self.Triton.getConcreteRegisterValue(Triton.registers.r14)
 
-        r15 = Triton.getConcreteRegisterValue(Triton.registers.r15)
+        r15 = self.Triton.getConcreteRegisterValue(Triton.registers.r15)
 
 
 
-        print('Next ip:', hex(ip), "rax: ", hex(ax), "rcx:", hex(cx),"rdx:", hex(dx),"rbx:", hex(bx),"rsi:", hex(si),"rdi:", hex(di),"rsp:", hex(sp), "rbp:", hex(bp) )
+        print('Next ip:', hex(ip), "rax: ", hex(ax), "rcx:", hex(cx),"rdx:", hex(dx),"rbx:", hex(bx),"rsi:", hex(si),"rdi:", hex(di),"rsp:", hex(sp), "rbp:", hex(bp), "r8:",hex(r8),"r9:",hex(r9),"r10:",hex(r10),"r11:",hex(r11),"r12:",hex(r12),"r13:",hex(r13),"r14:",hex(r14),"r15:",hex(r15), )
         
         return ip
 
@@ -275,11 +282,11 @@ class tracer_Plugin(idaapi.plugin_t):
         #self.symb_ex(ea)
 
         """
-        Triton.disassembly(block, ea)
+        self.Triton.disassembly(block, ea)
         print(block)
 
         sblock = Triton.simplify(block)
-        Triton.disassembly(sblock, ea)
+        self.Triton.disassembly(sblock, ea)
         print("simplified: " , sblock)
 
 
@@ -304,7 +311,7 @@ class tracer_Plugin(idaapi.plugin_t):
         
 
         evsblock = Triton.simplify(esblock)
-        Triton.disassembly(evsblock, 0x14000102C)
+        self.Triton.disassembly(evsblock, 0x14000102C)
         
         print("even more simplified: " , sblock)
 
