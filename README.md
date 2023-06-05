@@ -1,7 +1,8 @@
 # TritonTraceAssembly
-Creates a trace and gathers the trace together into a basic block
+Creates a trace, prints the registers and gathers the trace together into a basic block
 
+x86_64 only current version
 
-version 0.1
+version 0.2
 
-TO BE ADDED LATER
+ui completed 60%
