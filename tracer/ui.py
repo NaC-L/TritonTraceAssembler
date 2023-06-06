@@ -6,7 +6,6 @@ from tracer.TTA_tracer import *
 
 
 Tracer = TritonTracer()
-Tracer.init()
 
 
 class tracer_run_here_action(ida_kernwin.action_handler_t):
@@ -69,7 +68,7 @@ class tracer_registers_list_action(ida_kernwin.action_handler_t):
         ida_kernwin.action_handler_t.__init__(self)
 
     def activate(self, ctx):
-        print("registers_list")
+        Tracer.context_menu_dialog()
         return 1
 
     def update(self, ctx):
@@ -98,7 +97,7 @@ class tracer_write_memory_action(ida_kernwin.action_handler_t):
 
     def activate(self, ctx):
         
-        print("write memory")
+        Tracer.write_Memory_Access()
         return 1
 
     def update(self, ctx):
@@ -119,6 +118,17 @@ class tracer_load_binary_action(ida_kernwin.action_handler_t):
             return ida_kernwin.AST_ENABLE_FOR_WIDGET
         return ida_kernwin.AST_DISABLE_FOR_WIDGET
 
+class do_nothing(ida_kernwin.action_handler_t):
+    def __init__(self):
+        ida_kernwin.action_handler_t.__init__(self)
+
+    def activate(self, ctx):
+        return 1
+
+    def update(self, ctx):
+        if ctx.widget_type == ida_kernwin.BWN_DISASM:
+            return ida_kernwin.AST_ENABLE_FOR_WIDGET
+        return ida_kernwin.AST_DISABLE_FOR_WIDGET
 
 _act_dests = [
     
@@ -127,17 +137,23 @@ _act_dests = [
     ida_kernwin.action_desc_t(
         "TTA:Run until here", "Set tracer endpoint", tracer_set_until_action()),
     ida_kernwin.action_desc_t(
-        "TTA:Paste Assembled Trace Here", "Paste Assembled Trace here", tracer_paste_assembled()),
+        "TTA:Paste Assembled Trace Here", "Paste assembled trace here", tracer_paste_assembled()),
     ida_kernwin.action_desc_t(
         "TTA:Clear selection", "Clear selection", tracer_clear_selection()),
     ida_kernwin.action_desc_t(
-        "TTA:Register List", "Register List", tracer_registers_list_action()),
+        "TTA:-", "-", do_nothing()),
+    ida_kernwin.action_desc_t(
+        "TTA:Context menu", "Context menu", tracer_registers_list_action()),
+    ida_kernwin.action_desc_t(
+        "TTA:-", "-", do_nothing()),
     ida_kernwin.action_desc_t(
         "TTA:Read memory", "Read memory", tracer_read_memory_action()),
     ida_kernwin.action_desc_t(
         "TTA:Write memory", "Write memory", tracer_write_memory_action()),
     ida_kernwin.action_desc_t(
-        "TTA:Load Current Binary", "Load Current Binary", tracer_load_binary_action())
+        "TTA:-", "-", do_nothing()),
+    ida_kernwin.action_desc_t(
+        "TTA:Load Current Binary", "Load current binary", tracer_load_binary_action())
 ]
 
 

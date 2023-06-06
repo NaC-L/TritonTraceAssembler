@@ -12,7 +12,7 @@ import triton
 from triton import *
 
 
-from tracer.ui2 import tracer_read_dialog, tracer_read_size_dialog
+from tracer.ui2 import tracer_read_dialog, tracer_read_size_dialog, tracer_write_data_dialog, tracer_change_register, tracer_context_menu_dialog
 import ida_bytes
 import sys
 
@@ -33,6 +33,7 @@ class TritonTracer():
 	block = BasicBlock([])
 	symb_ex_end = 0
 	patch_start = 0
+	registers = [] 
 
 	def loadBinary(self):
 		last_addr = idaapi.inf_get_max_ea()
@@ -43,13 +44,33 @@ class TritonTracer():
 		print("imgbase: ", hex(imagebase), ", size: ", len(memory_bytes), ", 0x2850e :", hex ( memory_bytes[0x2850e] ), ", MemoryAccess 0x2850e :", hex(self.Triton.getConcreteMemoryValue(MemoryAccess(0x14002950e, CPUSIZE.DWORD))) )
 
 
-	def init(self):
+	def __init__(self): # X86_64 ONLY FOR NOW
 		self.Triton.setArchitecture(ARCH.X86_64)
 		self.insn = ida_ua.insn_t()
 
 		self.Triton.setMode(MODE.ALIGNED_MEMORY, True)
 		self.Triton.setMode(MODE.CONSTANT_FOLDING, True)
 		self.Triton.setMode(MODE.AST_OPTIMIZATIONS, True)
+		self.registers = [     self.Triton.registers.rax,
+    self.Triton.registers.rcx,
+    self.Triton.registers.rdx,
+    self.Triton.registers.rbx,
+    self.Triton.registers.rsi,
+    self.Triton.registers.rdi,
+    self.Triton.registers.rsp,
+    self.Triton.registers.rbp,
+    self.Triton.registers.r8,
+    self.Triton.registers.r9,
+    self.Triton.registers.r10,
+    self.Triton.registers.r11,
+    self.Triton.registers.r12,
+    self.Triton.registers.r13,
+    self.Triton.registers.r14,
+    self.Triton.registers.r15,
+    self.Triton.registers.cf,
+    self.Triton.registers.sf,
+    self.Triton.registers.zf,
+    self.Triton.registers.df ]
 
 
 	def symb_ex(self,ea):
@@ -177,14 +198,32 @@ class TritonTracer():
 		write_memory_address = tracer_read_dialog()
 		write_memory_address.Compile()
 		write_memory_address.Execute()
-		read_memory_size = tracer_read_size_dialog()
-		read_memory_size.Compile()
-		read_memory_size.Execute()
+		write_memory_value = tracer_write_data_dialog()
+		write_memory_value.Compile()
+		write_memory_value.Execute()
+
+
+		addr_value = write_memory_value.addr_value.value 
+		addr_bytes = addr_value.to_bytes((addr_value.bit_length() + 7) // 8, 'little')
 		
-		value = self.Triton.getConcreteMemoryValue( MemoryAccess( read_memory.address.value, read_memory_size.size.value ) )
+		self.Triton.setConcreteMemoryAreaValue( write_memory_address.address.value, addr_bytes)
 
-		print(hex(value))
 
+	def context_menu_dialog(self):
+		a = tracer_context_menu_dialog( self , [ [register, str(hex (self.Triton.getConcreteRegisterValue(register) ) ) ] for register in self.registers ] )
+		a.show()
+
+	def change_register_dialog(self, register):
+		write_memory_address = tracer_change_register(register.getName())
+		write_memory_address.Compile()
+		write_memory_address.reg_val.value = self.Triton.getConcreteRegisterValue(register)
+		write_memory_address.Execute()
+		self.change_register(register, write_memory_address.reg_val.value)
+		return write_memory_address.reg_val.value
+
+	def change_register(self, register, value):
+		self.Triton.setConcreteRegisterValue(register,value)
+		return
 
 	def clear_selection(self,ea):
 		current_ea = ea
@@ -212,11 +251,11 @@ class TritonTracer():
 		self.run_symb_ex(ea, self.symb_ex_end )
 
 		self.Triton.disassembly(self.block, ea)
-		print(self.block)
+		#print(self.block)
 
 		sblock = self.Triton.simplify(self.block)
 		self.Triton.disassembly(sblock, ea)
-		print("simplified: " , sblock)
+		#print("simplified: " , sblock)
 
 
 		#esblock = Triton.simplify(sblock)
