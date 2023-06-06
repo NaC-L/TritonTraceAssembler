@@ -8,5 +8,10 @@ version 0.8
 special thanks to 
 
 [Triton](https://github.com/JonathanSalwan/Triton)
+
+
 [NoVmpy](https://github.com/wallds/NoVmpy)
+
+
 [uEmu](https://github.com/alexhude/uEmu)
+
