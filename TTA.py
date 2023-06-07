@@ -4,25 +4,21 @@ import sys
 sys.stdout.encoding = 'utf-8'
 
 
-# for test
-# ida_loader.load_plugin('F:/NoVmpy/novmpy.py')
 import idaapi
 
-NOVMPY_VERSION = "0.1"
 
 
-class TestPlugin(idaapi.plugin_t):
+class TTA(idaapi.plugin_t):
     flags = 0
     comment = ""
     help = ""
-    wanted_name = "TestPlugin"
+    wanted_name = "TTA"
     wanted_hotkey = ""
 
     def __init__(self):
         super(TestPlugin, self).__init__()
 
     def init(self):
-        print("test")
         from tracer.ui import UIManager
         self.ui = UIManager()
 
@@ -38,4 +34,4 @@ class TestPlugin(idaapi.plugin_t):
 
 
 def PLUGIN_ENTRY():
-    return TestPlugin()
+    return TTA()
