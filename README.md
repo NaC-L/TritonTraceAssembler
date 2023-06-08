@@ -1,7 +1,7 @@
 # TritonTraceAssembly
 Creates a trace, prints the registers and (if you wish) gathers the trace together into a basic block, simplify it with triton and paste it. 
 
-current version supports x86_64 only. IDA PRO plugin
+current version supports x86_64 only. IDA plugin
 
 version 0.8
 
