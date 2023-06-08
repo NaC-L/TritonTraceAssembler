@@ -91,7 +91,7 @@ class TritonTracer():
 		if "ret" in self.inst.getDisassembly() and self.pushval == 1:
 			block_len = len(self.block.getInstructions() ) 
 
-			#print ( "Removing:", block_len - 1 ,self.block.remove(block_len - 1 ) )
+			print ( "Removing:", block_len - 1 ,self.block.remove(block_len - 1 ) )
 
 
 
