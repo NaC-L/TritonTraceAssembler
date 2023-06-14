@@ -30,10 +30,11 @@ class TritonTracer():
 	insn = ida_ua.insn_t()
 	function = {}
 	pushval = 0
-	block = BasicBlock([])
+	block = BasicBlock([Instruction(b"\x90")])
 	symb_ex_end = 0
 	patch_start = 0
 	registers = [] 
+	WriteList = []
 
 	def loadBinary(self):
 		last_addr = idaapi.inf_get_max_ea()
@@ -52,25 +53,106 @@ class TritonTracer():
 		self.Triton.setMode(MODE.CONSTANT_FOLDING, True)
 		self.Triton.setMode(MODE.AST_OPTIMIZATIONS, True)
 		self.registers = [     self.Triton.registers.rax,
-    self.Triton.registers.rcx,
-    self.Triton.registers.rdx,
-    self.Triton.registers.rbx,
-    self.Triton.registers.rsi,
-    self.Triton.registers.rdi,
-    self.Triton.registers.rsp,
-    self.Triton.registers.rbp,
-    self.Triton.registers.r8,
-    self.Triton.registers.r9,
-    self.Triton.registers.r10,
-    self.Triton.registers.r11,
-    self.Triton.registers.r12,
-    self.Triton.registers.r13,
-    self.Triton.registers.r14,
-    self.Triton.registers.r15,
-    self.Triton.registers.cf,
-    self.Triton.registers.sf,
-    self.Triton.registers.zf,
-    self.Triton.registers.df ]
+	    self.Triton.registers.rcx,
+	    self.Triton.registers.rdx,
+	    self.Triton.registers.rbx,
+	    self.Triton.registers.rsi,
+	    self.Triton.registers.rdi,
+	    self.Triton.registers.rsp,
+	    self.Triton.registers.rbp,
+	    self.Triton.registers.r8,
+	    self.Triton.registers.r9,
+	    self.Triton.registers.r10,
+	    self.Triton.registers.r11,
+	    self.Triton.registers.r12,
+	    self.Triton.registers.r13,
+	    self.Triton.registers.r14,
+	    self.Triton.registers.r15,
+	    self.Triton.registers.cf,
+	    self.Triton.registers.sf,
+	    self.Triton.registers.zf,
+	    self.Triton.registers.df ]
+
+    
+
+	def log_read_write(self,ea):
+		if  (not self.inst.isMemoryRead() and not self.inst.isMemoryWrite()):
+			return
+
+		operands = self.inst.getOperands()
+		newval = 0
+		for op in operands:
+			if type(op) == type(MemoryAccess(4,8)):
+				read_this_op = op.getAddress()
+				if self.inst.isMemoryWrite() or read_this_op in self.WriteList:
+					print("memwrite")
+					self.WriteList.append(read_this_op)
+					return
+
+				print( hex (read_this_op) )
+				value = self.Triton.getConcreteMemoryValue( MemoryAccess( read_this_op, op.getSize() ) )
+				print(value)
+				newval = value
+
+		if self.inst.isMemoryWrite() or len(operands) < 2 or not ( "mov" in self.inst.getDisassembly() ):
+			print("return!")
+			return
+
+		fake = []
+
+		print(operands[0].getName(),"xd?")
+
+		if operands[0].getName() == "r9d":
+			fake.append(b"\x41\xB9" + newval.to_bytes(4, 'little')  )
+			print(fake[0])
+			self.function[ea] = fake[0]
+		if operands[0].getName() == "r10d":
+			fake.append(b"\x41\xBA" + newval.to_bytes(4, 'little')  )
+			print(fake[0])
+			self.function[ea] = fake[0]
+		if operands[0].getName() == "r11d":
+			fake.append(b"\x41\xBB" + newval.to_bytes(4, 'little')  )
+			print(fake[0])
+			self.function[ea] = fake[0]
+		if operands[0].getName() == "edi":
+			fake.append(b"\xbf" + newval.to_bytes(4, 'little') )
+			print(fake[0])
+			self.function[ea] = fake[0]
+		if operands[0].getName() == "eax":
+			fake.append(b"\xb8" + newval.to_bytes(4, 'little') )
+			print(fake[0])
+			self.function[ea] = fake[0]
+		if operands[0].getName() == "ebx":
+			fake.append(b"\xbb" + newval.to_bytes(4, 'little') )
+			print(fake[0])
+			self.function[ea] = fake[0]
+		if operands[0].getName() == "edx":
+			fake.append(b"\xba" + newval.to_bytes(4, 'little') )
+			print(fake[0])
+			self.function[ea] = fake[0]
+		if operands[0].getName() == "ecx":
+			fake.append(b"\xb9" + newval.to_bytes(4, 'little') )
+			print(fake[0])
+			self.function[ea] = fake[0]
+		if operands[0].getName() == "rax":
+			fake.append(b"\x48\xB8" + newval.to_bytes(8, 'little') )
+			print(fake[0])
+			self.function[ea] = fake[0]
+		if operands[0].getName() == "esi":
+			fake.append(b"\xbe" + newval.to_bytes(4, 'little') )
+			print(fake[0])
+			self.function[ea] = fake[0]
+		if operands[0].getName() == "ebp":
+			fake.append(b"\xbd" + newval.to_bytes(4, 'little') )
+			print(fake[0])
+			self.function[ea] = fake[0]
+
+
+		
+
+
+
+
 
 
 	def symb_ex(self,ea):
@@ -93,10 +175,13 @@ class TritonTracer():
 
 			print ( "Removing:", block_len - 1 ,self.block.remove(block_len - 1 ) )
 
+		self.log_read_write(ea)
+
 
 
 
 		if  not ( self.inst.getDisassembly()[0] == "j"  or "ret" in self.inst.getDisassembly() or  "call" in self.inst.getDisassembly() )  :
+
 			self.block.add(Instruction(self.function[ea]))
 
 		self.pushval = 0
@@ -104,7 +189,7 @@ class TritonTracer():
 		if "push" in self.inst.getDisassembly():
 			self.pushval = 1
 
-		#self.log_read_write(ea)
+		
 
 		#print(block_len, ' - Curr ip:', self.inst)
 		print('Curr ip:', self.inst)
@@ -250,18 +335,24 @@ class TritonTracer():
 
 		self.run_symb_ex(ea, self.symb_ex_end )
 
+		#self.symb_ex(ea)
+
+		#if True:
+		#	return
+
 		self.Triton.disassembly(self.block, ea)
+
 		#print(self.block)
 
-		sblock = self.Triton.simplify(self.block)
-		self.Triton.disassembly(sblock, ea)
+		#sblock = self.Triton.simplify(self.block, llvm=True, solver=True)
+		#self.Triton.disassembly(sblock, ea)
 		#print("simplified: " , sblock)
 
 
 		#esblock = Triton.simplify(sblock)
 		#Triton.disassembly(esblock, 0x14000102C)
 
-		inst = sblock.getInstructions()
+		inst = self.block.getInstructions()
 		byte_ = b""
 		for instruction in inst:
 			byte_ = byte_ + ( instruction.getOpcode() )
