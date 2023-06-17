@@ -30,7 +30,7 @@ class TritonTracer():
 	insn = ida_ua.insn_t()
 	function = {}
 	pushval = 0
-	block = BasicBlock([Instruction(b"\x90"),Instruction(b"\x90"),Instruction(b"\x90"),Instruction(b"\x90"),Instruction(b"\x90"),Instruction(b"\x90")])
+	block = BasicBlock([Instruction(b"\x90"),Instruction(b"\x90"),Instruction(b"\x90"),Instruction(b"\x90"),Instruction(b"\x90"),Instruction(b"\x90"),Instruction(b"\x68\x11\xCA\x00\x00")])
 	symb_ex_end = 0
 	patch_start = 0
 	registers = [] 
@@ -58,26 +58,28 @@ class TritonTracer():
 		self.Triton.setMode(MODE.CONSTANT_FOLDING, True)
 		self.Triton.setMode(MODE.AST_OPTIMIZATIONS, True)
 		self.registers = [     self.Triton.registers.rax,
-	    self.Triton.registers.rcx,
-	    self.Triton.registers.rdx,
-	    self.Triton.registers.rbx,
-	    self.Triton.registers.rsi,
-	    self.Triton.registers.rdi,
-	    self.Triton.registers.rsp,
-	    self.Triton.registers.rbp,
-	    self.Triton.registers.r8,
-	    self.Triton.registers.r9,
-	    self.Triton.registers.r10,
-	    self.Triton.registers.r11,
-	    self.Triton.registers.r12,
-	    self.Triton.registers.r13,
-	    self.Triton.registers.r14,
-	    self.Triton.registers.r15,
-	    self.Triton.registers.cf,
-	    self.Triton.registers.sf,
-	    self.Triton.registers.zf,
-	    self.Triton.registers.df ]
-		self.retard_registers = { reg.getId():0 for reg in self.registers }
+		self.Triton.registers.rcx,
+		self.Triton.registers.rdx,
+		self.Triton.registers.rbx,
+		self.Triton.registers.rsi,
+		self.Triton.registers.rdi,
+		self.Triton.registers.rsp,
+		self.Triton.registers.rbp,
+		self.Triton.registers.r8,
+		self.Triton.registers.r9,
+		self.Triton.registers.r10,
+		self.Triton.registers.r11,
+		self.Triton.registers.r12,
+		self.Triton.registers.r13,
+		self.Triton.registers.r14,
+		self.Triton.registers.r15,
+		self.Triton.registers.cf,
+		self.Triton.registers.sf,
+		self.Triton.registers.zf,
+		self.Triton.registers.df ]
+		self.Triton.taintRegister(self.Triton.registers.ecx)
+		self.Triton.taintRegister(self.Triton.registers.edx)
+		self.Triton.taintRegister(self.Triton.registers.rsp)
 
 	
 
@@ -85,211 +87,66 @@ class TritonTracer():
 		if  (not self.inst.isMemoryRead() and not self.inst.isMemoryWrite()):
 			return
 
-		if self.inst.getType() == 0x23c:
-			rsp = self.Triton.getConcreteRegisterValue(self.Triton.registers.rsp)
-			self.WriteList.append(rsp)
-			print("memwrite_stack", rsp)
-			
-
 
 		operands = self.inst.getOperands()
-		newval = 0
-		for op in operands:
-			if type(op) == type(MemoryAccess(4,8)):
-				read_this_op = op.getAddress()
-				if self.inst.isMemoryWrite() or read_this_op in self.WriteList:
-					print("memwrite", read_this_op)
-					self.WriteList.append(read_this_op)
-					if op.getType() == 3:
-						self.retard_registers[operands[0].getId()] = 0
-					return
 
-				print( hex (read_this_op) )
-				value = self.Triton.getConcreteMemoryValue( MemoryAccess( read_this_op, op.getSize() ) )
-				print(value)
-				newval = value
-
-		if self.inst.isMemoryWrite() or len(operands) < 2 or not ( "mov" in self.inst.getDisassembly() ) or read_this_op in self.WriteList:
+		if len(operands) <= 1:
+			return
 			
-			print("return!")
+		if operands[0].getType() == OPERAND.MEM:
+			return
+			if self.Triton.isMemoryTainted(value = self.Triton.getConcreteMemoryValue( MemoryAccess( operands[0], operands[0].getSize() ) )):
+				return
+
+		if len(operands) <= 2:
 			return
 
-		fake = []
-		self.retard_registers[operands[0].getId()] = 1
-		print(operands[0].getName(),"xd?", read_this_op)
+		if operands[1].getType() == OPERAND.MEM:
+			if self.Triton.isMemoryTainted(value = self.Triton.getConcreteMemoryValue( MemoryAccess( operands[1], operands[1].getSize() ) )):
+				return
+		
+		
 		self.constPropagation(operands[0],newval,ea)
 
 
 	def constPropagation(self,operand,newval,ea):
 		fake = []
 
-		if operand == self.Triton.registers.r11b:
-			fake.append(b"\x41\xb3" + newval.to_bytes(1, 'little')  )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.r11
-		if operand == self.Triton.registers.r8b:
-			fake.append(b"\x41\xb0" + newval.to_bytes(1, 'little')  )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.r8b	
-		if operand == self.Triton.registers.dil:
-			fake.append(b"\x40\xb7" + newval.to_bytes(1, 'little')  )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.dil			
-		if operand == self.Triton.registers.di:
-			fake.append(b"\x66\xBF" + newval.to_bytes(2, 'little')  )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.di		
-		if operand == self.Triton.registers.r8d:
-			fake.append(b"\x41\xB8" + newval.to_bytes(4, 'little')  )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.r8d
-		
-		if operand == self.Triton.registers.r9d:
-			fake.append(b"\x41\xB9" + newval.to_bytes(4, 'little')  )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.r9d
-		
-		if operand == self.Triton.registers.r10d:
-			fake.append(b"\x41\xBA" + newval.to_bytes(4, 'little')  )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.r10d
+		register_byte_mapping = {
+		self.Triton.registers.r11b: b"\x41\xb3",
+		self.Triton.registers.r8b: b"\x41\xb0",
+		self.Triton.registers.dil: b"\x40\xb7",
+		self.Triton.registers.di: b"\x66\xBF",
+		self.Triton.registers.r8d: b"\x41\xB8",
+		self.Triton.registers.r9d: b"\x41\xB9",
+		self.Triton.registers.r10d: b"\x41\xBA",
+		self.Triton.registers.r11d: b"\x41\xBB",
+		self.Triton.registers.edi: b"\xbf",
+		self.Triton.registers.eax: b"\xb8",
+		self.Triton.registers.ebx: b"\xbb",
+		self.Triton.registers.edx: b"\xba",
+		self.Triton.registers.ecx: b"\xb9",
+		self.Triton.registers.esi: b"\xbe",
+		self.Triton.registers.ebp: b"\xbd",
+		self.Triton.registers.r8: b"\x49\xb8",
+		self.Triton.registers.r11: b"\x49\xbb",
+		self.Triton.registers.rax: b"\x48\xB8",
+		self.Triton.registers.rsi: b"\x48\xbe",
+		self.Triton.registers.rdi: b"\x48\xbf",
+		self.Triton.registers.rcx: b"\x48\xb9",
+		self.Triton.registers.rbp: b"\x48\xBD",
+		self.Triton.registers.cl: b"\xb1",
+		self.Triton.registers.sil: b"\x40\xb6",
+		}
 
-
-		if operand == self.Triton.registers.r11d:
-			fake.append(b"\x41\xBB" + newval.to_bytes(4, 'little')  )
+		if operand in register_byte_mapping:
+			print(operand,operand.getSize())
+			fake.append(register_byte_mapping[operand] + newval.to_bytes(operand.getSize(), 'little'))
 			print(fake[0])
 			self.function[ea] = fake[0]
 			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.r11d
+			self.peepholeRegister = operand
 
-		if operand== self.Triton.registers.edi:
-			fake.append(b"\xbf" + newval.to_bytes(4, 'little') )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.edi
-
-		if operand == self.Triton.registers.eax:
-			fake.append(b"\xb8" + newval.to_bytes(4, 'little') )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.eax
-
-		if operand == self.Triton.registers.ebx:
-			print("sup??")
-			fake.append(b"\xbb" + newval.to_bytes(4, 'little') )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.ebx
-
-		if operand == self.Triton.registers.edx:
-			fake.append(b"\xba" + newval.to_bytes(4, 'little') )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.edx
-
-		if operand == self.Triton.registers.ecx:
-			fake.append(b"\xb9" + newval.to_bytes(4, 'little') )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.ecx
-
-
-
-		if operand == self.Triton.registers.esi:
-			fake.append(b"\xbe" + newval.to_bytes(4, 'little') )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.esi
-
-
-		if operand == self.Triton.registers.ebp:
-			fake.append(b"\xbd" + newval.to_bytes(4, 'little') )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.ebp
-
-		if operand == self.Triton.registers.r8:
-			fake.append(b"\x49\xb8" + newval.to_bytes(8, 'little')  )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.r8	
-
-		if operand == self.Triton.registers.r11:
-			fake.append(b"\x49\xbb" + newval.to_bytes(8, 'little')  )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.r11		
-
-		if operand == self.Triton.registers.rax:
-			fake.append(b"\x48\xB8" + newval.to_bytes(8, 'little') )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.rax
-
-		if operand == self.Triton.registers.rsi:
-			fake.append(b"\x48\xbe" + newval.to_bytes(8, 'little') )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.rsi
-		
-		if operand == self.Triton.registers.rdi:
-			fake.append(b"\x48\xbf" + newval.to_bytes(8, 'little') )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.rdi	
-
-		if operand == self.Triton.registers.rcx:
-			fake.append(b"\x48\xb9" + newval.to_bytes(8, 'little') )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.rcx	
-
-		if operand == self.Triton.registers.rbp:
-			fake.append(b"\x48\xBD" + newval.to_bytes(8, 'little') )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.rbp	
-
-		if operand == self.Triton.registers.cl:
-			fake.append(b"\xb1" + newval.to_bytes(1, 'little') )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.cl
-		if operand == self.Triton.registers.sil:
-			fake.append(b"\x40\xb6" + newval.to_bytes(1, 'little') )
-			print(fake[0])
-			self.function[ea] = fake[0]
-			self.peephole = True
-			self.peepholeRegister = self.Triton.registers.sil
 
 
 	def peepholeOpt(self,ea):
@@ -297,65 +154,15 @@ class TritonTracer():
 		this_inst = self.inst
 		operands = this_inst.getOperands()
 
-		if (self.inst.getType() == 0x161 or self.inst.getType() == 0x162) and len(operands) == 2  and  (type(operands[1]) == type(Immediate(0x1234, CPUSIZE.DWORD))) :
-			operand = self.Triton.getParentRegister(operands[0]).getId()
-			print(self.retard_registers)
-			print("op",operand)
-			self.retard_registers[operand] = 1
-			self.peepholeRegister = operands[0]
-			self.peephole = True
-				
-
-
-		if self.peephole == False  or type(self.peepholeRegister) != type(self.Triton.registers.ecx)   :
-			self.dontrun = False
-			return True
-
-		if (self.inst.getType() == 0x209) or (self.inst.getType() == 0x23c) or self.inst.getType() == 0x51 or self.inst.getType() == 0x2a5 :
-			self.dontrun = False
-			return True			
-
-		
-
-		if len(operands) == 0 or type(operands[0] ) != type(self.Triton.registers.ecx):
-			return True
-
-		special = False
-		if type(operands[0] ) == type(self.Triton.registers.ecx) and self.peepholeRegister.isOverlapWith(operands[0]):
-			print("operanding!")
-			self.peepholeRegister = operands[0]
-			self.peephole = True
-			special = True
-			operand = self.Triton.getParentRegister(operands[0]).getId()
-			self.retard_registers[operand] = 1
-
-
-
-		if (self.inst.getType() == 0x161 or self.inst.getType() == 0x162) and type(operands[1]) == type(self.Triton.registers.ecx):
-			print("getting operand1's opts flag")
-
-			self.retard_registers[self.Triton.getParentRegister(operands[0]).getId()] = self.retard_registers[self.Triton.getParentRegister(operands[1]).getId()]
-
-
-
-		if len(operands) == 2 and (type(operands[1]) != type(Immediate(0x1234, CPUSIZE.DWORD)) and not special )	:
-			#self.peephole = False
-			self.dontrun = False
-			#self.peepholeRegister = None
-			return True			
-
-		if len(operands) == 2 and type(operands[1]) == type(MemoryAccess(4, CPUSIZE.DWORD)):
+		if len(operands) <= 1:
 			self.dontrun = False
 			return
 
-		if len(operands) >= 1:
-			operand = self.Triton.getParentRegister(operands[0]).getId()
-
-			if (self.retard_registers[operand] == 0):
-				self.dontrun = False
+		if operands[0].getType() == OPERAND.REG:
+			if self.Triton.isRegisterTainted(operands[0]):
 				return
-
-
+		else:
+			return
 
 		self.ip = self.Triton.getRegisterAst(self.Triton.registers.rip).evaluate()
 		self.dontrun = True
@@ -365,7 +172,7 @@ class TritonTracer():
 
 		self.constPropagation(operands[0],newval,ea)
 		print("peepholing",operands[0], newval)
-		return False
+		return 
 
 
 
