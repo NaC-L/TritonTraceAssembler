@@ -12,7 +12,7 @@ import triton
 from triton import *
 
 
-from tracer.ui2 import tracer_read_dialog, tracer_read_size_dialog, tracer_write_data_dialog, tracer_change_register, tracer_context_menu_dialog
+from tracer.ui2 import tracer_read_dialog, tracer_read_size_dialog, tracer_write_data_dialog, tracer_change_register, tracer_context_menu_dialog, tracer_taint_mem_dialog, tracer_taint_mem_size_dialog, tracer_taint_menu_dialog
 import ida_bytes
 import sys
 
@@ -79,12 +79,13 @@ class TritonTracer():
 		self.Triton.registers.df ]
 		self.Triton.taintRegister(self.Triton.registers.ecx)
 		self.Triton.taintRegister(self.Triton.registers.edx)
-		self.Triton.taintRegister(self.Triton.registers.rsp)
+		#self.Triton.taintRegister(self.Triton.registers.rsp)
 
 	
 
 	def log_read_write(self,ea):
-		if  (not self.inst.isMemoryRead() and not self.inst.isMemoryWrite()):
+		this_inst = self.inst
+		if  (not self.inst.isMemoryRead() and not self.inst.isMemoryWrite()) or this_inst.getType() == OPCODE.X86.POP or this_inst.getType() == OPCODE.X86.PUSH or this_inst.getType() == OPCODE.X86.PUSHF or this_inst.getType() == OPCODE.X86.POPF :
 			return
 
 
@@ -103,6 +104,7 @@ class TritonTracer():
 
 		if operands[1].getType() == OPERAND.MEM:
 			if self.Triton.isMemoryTainted(value = self.Triton.getConcreteMemoryValue( MemoryAccess( operands[1], operands[1].getSize() ) )):
+				print("memory tainted")
 				return
 		
 		
@@ -113,30 +115,82 @@ class TritonTracer():
 		fake = []
 
 		register_byte_mapping = {
+
+		self.Triton.registers.r8b: b"\x41\xb0", # bytes of each - mov reg  (, imm (added later) )
+		self.Triton.registers.r9b: b"\x41\xb1",
+		self.Triton.registers.r10b: b"\x41\xb2",
 		self.Triton.registers.r11b: b"\x41\xb3",
-		self.Triton.registers.r8b: b"\x41\xb0",
-		self.Triton.registers.dil: b"\x40\xb7",
-		self.Triton.registers.di: b"\x66\xBF",
-		self.Triton.registers.r8d: b"\x41\xB8",
-		self.Triton.registers.r9d: b"\x41\xB9",
-		self.Triton.registers.r10d: b"\x41\xBA",
-		self.Triton.registers.r11d: b"\x41\xBB",
-		self.Triton.registers.edi: b"\xbf",
-		self.Triton.registers.eax: b"\xb8",
-		self.Triton.registers.ebx: b"\xbb",
-		self.Triton.registers.edx: b"\xba",
-		self.Triton.registers.ecx: b"\xb9",
-		self.Triton.registers.esi: b"\xbe",
-		self.Triton.registers.ebp: b"\xbd",
+		self.Triton.registers.r12b: b"\x41\xb4",
+		self.Triton.registers.r13b: b"\x41\xb5",
+		self.Triton.registers.r14b: b"\x41\xb6",
+		self.Triton.registers.r15b: b"\x41\xb7",
+		
+		self.Triton.registers.r8d: b"\x41\xb8",
+		self.Triton.registers.r9d: b"\x41\xb9",
+		self.Triton.registers.r10d: b"\x41\xba",
+		self.Triton.registers.r11d: b"\x41\xbb",
+		self.Triton.registers.r12d: b"\x41\xbc",
+		self.Triton.registers.r13d: b"\x41\xbd",
+		self.Triton.registers.r14d: b"\x41\xbe",
+		self.Triton.registers.r15d: b"\x41\xbf",
+		
 		self.Triton.registers.r8: b"\x49\xb8",
+		self.Triton.registers.r9: b"\x49\xb9",
+		self.Triton.registers.r10: b"\x49\xba",
 		self.Triton.registers.r11: b"\x49\xbb",
+		self.Triton.registers.r12: b"\x49\xbc",
+		self.Triton.registers.r13: b"\x49\xbd",
+		self.Triton.registers.r14: b"\x49\xbe",
+		self.Triton.registers.r15: b"\x49\xbf",
+
+		self.Triton.registers.al: b"\xB0",
+		self.Triton.registers.cl: b"\xB1",
+		self.Triton.registers.dl: b"\xB2",
+		self.Triton.registers.bl: b"\xB3",
+
+		self.Triton.registers.ah: b"\xB4",
+		self.Triton.registers.ch: b"\xB5",
+		self.Triton.registers.dh: b"\xB6",
+		self.Triton.registers.bh: b"\xB7",
+
+		self.Triton.registers.spl: b"\x40\xb4",
+		self.Triton.registers.bpl: b"\x40\xb5",
+		self.Triton.registers.sil: b"\x40\xb6",
+		self.Triton.registers.dil: b"\x40\xb7",
+
+
+		self.Triton.registers.ax: b"\x66\xB8",
+		self.Triton.registers.cx: b"\x66\xB9",
+		self.Triton.registers.dx: b"\x66\xBA",
+		self.Triton.registers.bx: b"\x66\xBB",
+		self.Triton.registers.sp: b"\x66\xBC",
+		self.Triton.registers.bp: b"\x66\xBD",
+		self.Triton.registers.si: b"\x66\xBE",
+		self.Triton.registers.di: b"\x66\xBF",
+
+		self.Triton.registers.eax: b"\xb8",
+		self.Triton.registers.ecx: b"\xb9",
+		self.Triton.registers.edx: b"\xba",
+		self.Triton.registers.ebx: b"\xbb",
+		self.Triton.registers.esp: b"\xbc",
+		self.Triton.registers.ebp: b"\xbd",
+		self.Triton.registers.esi: b"\xbe",
+		self.Triton.registers.edi: b"\xbf",
+
 		self.Triton.registers.rax: b"\x48\xB8",
+		self.Triton.registers.rcx: b"\x48\xb9",
+		self.Triton.registers.rdx: b"\x48\xba",
+		self.Triton.registers.rbx: b"\x48\xbb",
+		self.Triton.registers.rsp: b"\x48\xbc",
+		self.Triton.registers.rbp: b"\x48\xbd",
 		self.Triton.registers.rsi: b"\x48\xbe",
 		self.Triton.registers.rdi: b"\x48\xbf",
-		self.Triton.registers.rcx: b"\x48\xb9",
-		self.Triton.registers.rbp: b"\x48\xBD",
-		self.Triton.registers.cl: b"\xb1",
-		self.Triton.registers.sil: b"\x40\xb6",
+
+		
+		
+		
+
+		
 		}
 
 		if operand in register_byte_mapping:
@@ -154,15 +208,24 @@ class TritonTracer():
 		this_inst = self.inst
 		operands = this_inst.getOperands()
 
-		if len(operands) <= 1:
+		if this_inst.getType() == OPCODE.X86.CMP or this_inst.getType() == OPCODE.X86.TEST or this_inst.getType() == OPCODE.X86.POP or this_inst.getType() == OPCODE.X86.PUSH:
+			return
+
+		if len(operands) < 1:
 			self.dontrun = False
 			return
 
 		if operands[0].getType() == OPERAND.REG:
 			if self.Triton.isRegisterTainted(operands[0]):
+				print("register tainted")
 				return
 		else:
 			return
+		if len(operands) == 2:
+			if operands[1].getType() == OPERAND.REG:
+				if self.Triton.isRegisterTainted(operands[1]):
+					print("second register tainted")
+					return
 
 		self.ip = self.Triton.getRegisterAst(self.Triton.registers.rip).evaluate()
 		self.dontrun = True
@@ -325,6 +388,37 @@ class TritonTracer():
 		a = tracer_context_menu_dialog( self , [ [register, str(hex (self.Triton.getConcreteRegisterValue(register) ) ) ] for register in self.registers ] )
 		a.show()
 
+	def taint_memory(self):
+		read_memory_address = tracer_taint_mem_dialog()
+		read_memory_address.Compile()
+		read_memory_address.Execute()
+		read_memory_size = tracer_taint_mem_size_dialog()
+		read_memory_size.Compile()
+		read_memory_size.Execute()
+
+		taintval = MemoryAccess( read_memory_address.address.value, read_memory_size.size.value )
+
+		isTainted = self.Triton.isMemoryTainted(taintval)
+
+		print("isTainted: ", isTainted)
+
+		if isTainted:
+			return self.Triton.untaintMemory( taintval )
+
+
+		value = self.Triton.taintMemory( taintval )
+
+
+	def tracer_taint_menu_dialog(self):
+		a = tracer_taint_menu_dialog( self , [ [register, str( (self.Triton.isRegisterTainted(register) ) ) ] for register in self.Triton.getAllRegisters() ] )
+		a.show()
+
+	def taint_register(self, register):
+		if self.Triton.isMemoryTainted(register):
+			return self.Triton.untaintRegister( register )
+		self.Triton.taintRegister(register)
+		return
+
 	def change_register_dialog(self, register):
 		write_memory_address = tracer_change_register(register.getName())
 		write_memory_address.Compile()
@@ -376,8 +470,8 @@ class TritonTracer():
 		#print("simplified: " , sblock)
 
 
-		#esblock = Triton.simplify(sblock)
-		#Triton.disassembly(esblock, 0x14000102C)
+		#esblock = self.Triton.simplify(sblock)
+		#self.Triton.disassembly(esblock, 0x14000102C)
 
 		inst = sblock.getInstructions()
 		byte_ = b""
